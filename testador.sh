@@ -11,23 +11,26 @@
 # 	   - Work with generic amount of tests
 # Updated: Jonas Cardoso (18/03/2019)
 #	   - Updated url
+# Updated: Jonas Cardoso (29/05/2019)
+#	   - Added method to use different "class"
+#	   - Execution priority for "lab_main.py" and then "lab.py"
+#	   - Checking improved for files ".in" and ".out"
 ###########################################################
 
 #!/bin/bash
 
 self="${0##*/}"
 
-[ $# -eq 1 ] ||
-{ echo "Uso: ./$self <laboratorio>"; exit 1; }
+[ $# -eq 2 ] ||
+{ echo "Uso: ./$self <laboratorio> <turma>"; echo "Exp: ./$self 11 mc102qr"; exit 1; }
 
 lab=$1
+turma=$2
 
 # Verificando se o comando curl está instalado:
 
 hash curl 2>/dev/null ||
 { echo "Erro: este script necessita do programa curl instalado."; exit 1; }
-
-
 
 # Caso o programa exija compilacao, por exemplo programas em c ou c++, descomente 
 # as linhas seguintes e modifique conforme necessario para compilar corretamente
@@ -45,15 +48,25 @@ hash curl 2>/dev/null ||
 
 # Verifica se o repositorio de testes existe
 accept="y"
-if [ ! -d "testes" ]; then
+n=0
+for counter in 01 02 03 04 05 06 07 08 09 $(seq 10 18)
+do 
+    if [ ! -d testes/$lab ] ||  [ ! -f testes/$lab/arq${counter}.in ] || [ ! -f testes/$lab/arq${counter}.res ];then
+            ((n++))
+            break
+    fi
+done
+
+if [ $n -eq 1 ]; then
     echo "Criando diretorio de testes..."
-    mkdir -p testes
-else
+    mkdir -p testes/$lab
+
+elif [ $n -eq 0 ]; then
     echo "Diretorio de testes existe, baixar testes novamente? (y/n)"
     read accept
 fi
 
-cd testes
+cd testes/$lab
 
 # Baixa os arquivos de teste
 if [ "$accept" == "y" ]; then
@@ -65,7 +78,7 @@ if [ "$accept" == "y" ]; then
         echo "Sem conexao, mantendo testes atuais"
     else
         echo "SuSy esta disponivel!"
-        rm -rf *
+        rm -rf *.in, *.out, *.res
         # Fazendo download dos arquivos de testes
         echo "Baixando os arquivos de testes..."
         i="1"
@@ -74,10 +87,10 @@ if [ "$accept" == "y" ]; then
             cur=$(printf "%02d" $i)
 
             # Entrada
-            curl https://susy.ic.unicamp.br:9999/mc102qr/$lab/dados/arq$cur.in --insecure -O -s -L
+            curl https://susy.ic.unicamp.br:9999/$turma/$lab/dados/arq$cur.in --insecure -O -s -L
 
             # Resposta
-            curl https://susy.ic.unicamp.br:9999/mc102qr/$lab/dados/arq$cur.out --insecure -s -L -o arq$cur.res
+            curl https://susy.ic.unicamp.br:9999/$turma/$lab/dados/arq$cur.out --insecure -s -L -o arq$cur.res
 
             # Como a quantidade de testes nao eh fixa precisamos testar se o arquivo que baixamos
             # ainda eh um teste, se nao for apagamos ele e terminamos
@@ -98,6 +111,7 @@ echo "Executando os testes..."
 # Verifica se existem testes
 if [ ! -f "arq01.in" ]; then
     echo "Erro! Testes nao encontrados!"
+    echo "Verifique se inseriu sua turma corretamente!"
     exit
 fi
 
@@ -108,7 +122,11 @@ for input in `ls -1 arq*in`; do
 
     # Executa o programa. Atere caso esteja rodando diferentes programas, como progamas em 
     # c ou c++
-    python3 ../lab$lab.py < $input > $output
+    if [ -f ../../lab${lab}_main.py ]; then
+        python3 ../../lab${lab}_main.py < $input > $output
+    else
+        python3 ../../lab${lab}.py < $input > $output
+    fi
 done
 
 # Compara os resultados
